@@ -21,6 +21,8 @@ Options:
   --replay FILE     Replay a test from a given file.
 ";
 
+const DEFAULT_CHAIN: &'static str = include_str!("chainspec.json");
+
 #[derive(Debug, RustcDecodable)]
 struct Args {
 	flag_replay: Option<String>,
