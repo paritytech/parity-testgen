@@ -1,0 +1,10 @@
+[package]
+name = "parity-testgen"
+version = "0.1.0"
+authors = ["Ethcore <admin@ethcore.io>"]
+
+[dependencies]
+ethkey = { git = "https://github.com/ethcore/ethkey.git" }
+rand = "0.3"
+docopt = "0.6"
+rustc-serialize = "0.3"
