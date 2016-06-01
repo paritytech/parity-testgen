@@ -4,8 +4,10 @@ extern crate rand;
 extern crate rustc_serialize;
 
 use std::path::PathBuf;
-
 use ethkey::{Address, KeyPair, Secret};
+
+mod generate;
+mod replay;
 
 const USAGE: &'static str = "
 Parity-testgen
@@ -38,21 +40,17 @@ enum Actions {
 	BlockMined(Vec<u8>),
 }
 
-/// get the temp directory to give to parity.
+/// get the temp directory to place files in.
 fn get_temp_dir() -> PathBuf {
+	use rand::Rng;
+
+	const PATH_LEN: usize = 12;
+
+	let mut rng = rand::thread_rng();
 	let mut temp_dir = ::std::env::temp_dir();
-	temp_dir.push(".parity");
+	let random_dir: String = (0..PATH_LEN).map(|_| (rng.gen::<u8>() % 26 + 97) as char).collect();
+	temp_dir.push(&random_dir);
 	temp_dir
-}
-
-// generate a test.
-fn generate() {
-	unimplemented!();
-}
-
-// replay a test from a file.
-fn replay_from(_file_path: PathBuf) {
-	unimplemented!();
 }
 
 fn main() {
@@ -60,6 +58,8 @@ fn main() {
 
 	let _temp_dir = get_temp_dir();
 	if let Some(file) = args.flag_replay {
-		replay_from(file.into());
+		::replay::replay(file.into());
+	} else {
+		::generate::generate();
 	}
 }
