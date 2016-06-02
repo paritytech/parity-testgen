@@ -9,3 +9,4 @@ ethstore = { git = "https://github.com/ethcore/ethstore.git" }
 rand = "0.3"
 docopt = "0.6"
 rustc-serialize = "0.3"
+time = "0.1"

@@ -3,8 +3,10 @@ extern crate ethkey;
 extern crate ethstore;
 extern crate rand;
 extern crate rustc_serialize;
+extern crate time;
 
 use std::path::PathBuf;
+use std::process::Command;
 
 use ethkey::{Address, KeyPair, Secret};
 use ethstore::{DiskDirectory, EthStore};
@@ -18,12 +20,16 @@ Automatic parity test generation and replay.
 
 Usage:
   parity-testgen --replay <file>
+  parity-testgen --parity <string>
   parity-testgen (-h | --help)
   parity-testgen [options]
 
 Options:
   -h --help         Show this screen.
   --replay FILE     Replay a test from a given file.
+  --parity FILE     The parity executable to run.
+  --time SECONDS    The amount of time to spend generating a test.
+                    Note that the blocktime is 15 seconds. [default: 900]
 ";
 
 const DEFAULT_CHAIN: &'static str = include_str!("chainspec.json");
@@ -31,10 +37,12 @@ const DEFAULT_CHAIN: &'static str = include_str!("chainspec.json");
 #[derive(Debug, RustcDecodable)]
 struct Args {
 	flag_replay: Option<String>,
+	flag_parity: Option<String>,
+	flag_time: usize,
 }
 
 // actions which can be taken in the log file.
-enum Actions {
+enum Action {
 	// account details,
 	CreateAccount(Address, Secret, String),
 	// "retire" an account, making it go dormant
@@ -88,28 +96,43 @@ impl Directories {
 }
 
 /// Parameters to generation and replay functions.
-struct Params {
+pub struct Params {
 	dirs: Directories,
 	key_store: EthStore,
+	args: Args,
 	// configuration soon
 }
 
 impl Params {
 	// initialize the parameters from a directories structure.
-	fn from_directories(dirs: Directories) -> Self {
-		let disk_directory = DiskDirectory::create(dirs.keys());
+	fn from_directories(dirs: Directories, args: Args) -> Self {
+		let disk_directory = match DiskDirectory::create(dirs.keys()) {
+			Ok(dd) => dd,
+			Err(e) => panic!("Failed to create key store: {}", e),
+		};
+
 		Params {
 			dirs: dirs,
-			key_store: EthStore::open(Box::new(disk_directory)).expect("Failed to open key store directory.");
+			key_store: EthStore::open(Box::new(disk_directory)).expect("Failed to open key store directory."),
+			args: args,
 		}
+	}
+
+	// get the command to run parity.
+	fn parity_command(&self) -> Command {
+		let mut c = Command::new(self.args.flag_parity.clone().unwrap_or("parity".into()));
+		c.arg("--keys-path").arg(self.dirs.keys());
+		c.arg("--db-path").arg(self.dirs.db());
+
+		c
 	}
 }
 
 fn main() {
 	let args: Args = docopt::Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
 
-	let params = Params::from_directories(Directories::temp_random());
-	if let Some(file) = args.flag_replay {
+	let params = Params::from_directories(Directories::temp_random(), args);
+	if let Some(file) = params.args.flag_replay.clone() {
 		::replay::replay(file.into(), params);
 	} else {
 		::generate::generate(params);
