@@ -1,8 +1,11 @@
 extern crate docopt;
 extern crate ethkey;
 extern crate ethstore;
+extern crate hyper;
 extern crate rand;
 extern crate rustc_serialize;
+extern crate serde;
+extern crate serde_json;
 extern crate time;
 
 use std::path::PathBuf;
@@ -13,6 +16,7 @@ use ethstore::{DiskDirectory, EthStore};
 
 mod generate;
 mod replay;
+mod rpc;
 
 const USAGE: &'static str = "
 Parity-testgen
@@ -21,6 +25,7 @@ Automatic parity test generation and replay.
 Usage:
   parity-testgen --replay <file>
   parity-testgen --parity <string>
+  parity-testgen --time <num> [options]
   parity-testgen (-h | --help)
   parity-testgen [options]
 

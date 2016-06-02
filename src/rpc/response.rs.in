@@ -1,0 +1,24 @@
+use super::Error;
+
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct Response<T> {
+	jsonrpc: String,
+	result: T,
+	id: usize,
+}
+
+impl<T: Deserialize> Response<T> {
+	/// Deserialize the response from json.
+	///
+	/// Used to help the inference engine know what type to deserialize to.
+	pub fn from_json(json: &str) -> Result<Self, Error> {
+		::serde_json::from_str(json).map_err(Error::Serde)
+	}
+
+	/// consume the response, returning the result.
+	pub fn result(self) -> T {
+		self.result
+	}
+}
