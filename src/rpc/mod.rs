@@ -1,6 +1,6 @@
 //! RPC client for communicating with parity.
 use ethkey::Address;
-use hyper::{self, Client};
+use hyper::{self, Client as HttpClient};
 use serde::Deserialize;
 use serde_json;
 
@@ -21,18 +21,18 @@ pub enum Error {
 // could make this configurable at some point
 const PORT: u16 = 8545;
 
-pub struct RpcClient {
-	http_client: Client,
+pub struct Client {
+	http_client: HttpClient,
 	server_url: String,
 	req_id: usize
 }
 
-impl RpcClient {
+impl Client {
 	/// Create a new RpcClient
-	pub fn new(ip: Ipv4Addr) -> Self {
-		RpcClient {
-			http_client: Client::new(),
-			server_url: format!("http://{}:{}", ip, PORT),
+	pub fn new() -> Self {
+		Client {
+			http_client: HttpClient::new(),
+			server_url: format!("http://localhost:{}", PORT),
 			req_id: 0,
 		}
 	}

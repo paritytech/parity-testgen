@@ -46,10 +46,45 @@ struct Args {
 	flag_time: usize,
 }
 
+/// Account metadata. This is created using a KeyStore shared by parity_testgen
+/// and parity itself.
+struct Account {
+	address: Address,
+	secret: Secret,
+	pass: String,
+}
+
+impl Account {
+	/// Create a new account.
+	pub fn new(addr: Address, secret: Secret, pass: String) -> Account {
+		Account {
+			address: addr,
+			secret: secret,
+			pass: pass,
+		}
+	}
+
+	/// Get the accont's address.
+	pub fn address(&self) -> Address { self.address.clone() }
+
+	/// Get the account's secret key.
+	pub fn secret(&self) -> Secret { self.secret.clone() }
+
+	/// Get the account's password.
+	pub fn pass(&self) -> String { self.pass.clone() }
+}
+
+fn random_ascii_lowercase(len: usize) -> String {
+	use rand::Rng;
+
+	let mut rng = rand::thread_rng();
+	(0..len).map(|_| (rng.gen::<u8>() % 26 + 97) as char).collect()
+}
+
 // actions which can be taken in the log file.
 enum Action {
 	// account details,
-	CreateAccount(Address, Secret, String),
+	CreateAccount(Account),
 	// "retire" an account, making it go dormant
 	RetireAccount(Address),
 	// a block was mined, this will be some raw data for the replay.
@@ -64,13 +99,10 @@ struct Directories {
 impl Directories {
 	/// With a new, temporary, random root.
 	pub fn temp_random() -> Self {
-		use rand::Rng;
-
 		const PATH_LEN: usize = 12;
 
-		let mut rng = rand::thread_rng();
 		let mut temp_dir = ::std::env::temp_dir();
-		let random_dir: String = (0..PATH_LEN).map(|_| (rng.gen::<u8>() % 26 + 97) as char).collect();
+		let random_dir: String = random_ascii_lowercase(PATH_LEN);
 		temp_dir.push(&random_dir);
 		Directories::with_root(temp_dir)
 	}
