@@ -8,6 +8,8 @@ extern crate serde;
 extern crate serde_json;
 extern crate time;
 
+use std::io::Write;
+use std::fs::File;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -130,6 +132,13 @@ impl Directories {
 		db.push("db");
 		db
 	}
+
+	/// Get the chain.json file
+	pub fn chain_file(&self) -> PathBuf {
+		let mut chain = self.root.clone();
+		chain.push("chain.json");
+		chain
+	}
 }
 
 /// Parameters to generation and replay functions.
@@ -137,16 +146,20 @@ pub struct Params {
 	dirs: Directories,
 	key_store: EthStore,
 	args: Args,
-	// configuration soon
 }
 
 impl Params {
 	// initialize the parameters from a directories structure.
 	fn from_directories(dirs: Directories, args: Args) -> Self {
+		println!("Using directory: {}", dirs.root().to_str().unwrap());
+
 		let disk_directory = match DiskDirectory::create(dirs.keys()) {
 			Ok(dd) => dd,
 			Err(e) => panic!("Failed to create key store: {}", e),
 		};
+
+		let mut chain_file = File::create(dirs.chain_file()).unwrap();
+		let _ = write!(chain_file, "{}", DEFAULT_CHAIN);
 
 		Params {
 			dirs: dirs,
@@ -160,7 +173,7 @@ impl Params {
 		let mut c = Command::new(self.args.flag_parity.clone().unwrap_or("parity".into()));
 		c.arg("--keys-path").arg(self.dirs.keys());
 		c.arg("--db-path").arg(self.dirs.db());
-
+		c.arg("--chain").arg(self.dirs.chain_file());
 		c
 	}
 }

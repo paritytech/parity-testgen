@@ -6,6 +6,7 @@ use ethstore::{EthStore, SecretStore};
 use time::{self, Duration, Tm};
 use rand::{Rng, OsRng};
 
+use std::process::Command;
 use std::thread;
 
 // only wake up every X milliseconds.
@@ -56,13 +57,16 @@ impl Simulation {
 			self.store.insert_account(secret.clone(), &pass).expect("failed to insert account");
 			let account = Account::new(address, secret, pass);
 
-			if self.rng.gen::<f32>() <= MINER_PROPORTION {
+			// have the first account be a miner.
+			if self.users.is_empty() && self.miners.is_empty() {
+				self.client.set_author(account.address());
+				self.miners.push(account);
+			} else if self.rng.gen::<f32>() <= MINER_PROPORTION {
 				self.miners.push(account);
 			} else {
 				self.users.push(account);
 			}
 		}
-
 
 	}
 }
@@ -76,11 +80,20 @@ pub fn generate(params: Params) {
 	let start = time::now();
 	let end = start + run_for;
 
+	println!("Executing parity");
+	// todo: set Stdout, etc.
+	let mut parity_child = params.parity_command().spawn().unwrap();
 	let mut sim = Simulation::new(start, params.key_store);
+
+	let mut ethminer_child = Command::new("ethminer").spawn().unwrap();
 
 	while time::now() < end {
 		sim.tick();
 
 		thread::sleep(sleep_between);
 	}
+
+	println!("Ending simulation");
+	parity_child.kill();
+	ethminer_child.kill();
 }

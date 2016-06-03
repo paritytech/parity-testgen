@@ -33,14 +33,22 @@ impl Client {
 		Client {
 			http_client: HttpClient::new(),
 			server_url: format!("http://localhost:{}", PORT),
-			req_id: 0,
+			req_id: 1,
 		}
+	}
+
+	fn request_using<T: Deserialize>(&mut self, req: String) -> Result<T, Error> {
+		self.req_id += 1;
+		let mut res_str = String::new();
+		let mut res = try!(self.http_client.post(&self.server_url).body(&req).send().map_err(Error::Hyper));
+		try!(res.read_to_string(&mut res_str).map_err(Error::Io));
+
+		Ok(try!(Response::from_json(&res_str)).result())
 	}
 
 	/// Get the balance (in wei) of the given account at the latest
 	/// block.
 	pub fn balance(&mut self, address: Address) -> Result<usize, Error> {
-		self.req_id += 1;
 		let req = format!(r#"{{
 			"jsonrpc": "2.0",
 			"method": "eth_getBalance",
@@ -51,10 +59,21 @@ impl Client {
 			"id": {}
 		}}"#, address, self.req_id);
 
-		let mut res_str = String::new();
-		let mut res = try!(self.http_client.post(&self.server_url).body(&req).send().map_err(Error::Hyper));
-		try!(res.read_to_string(&mut res_str).map_err(Error::Io));
+		self.request_using::<usize>(req)
+	}
 
-		Ok(try!(Response::from_json(&res_str)).result())
+	/// Set the address to author blocks as.
+	pub fn set_author(&mut self, address: Address) -> Result<bool, Error> {
+		self.req_id += 1;
+		let req = format!(r#"{{
+			"jsonrpc": "2.0",
+			"method": "ethcore_setAuthor",
+			"params": [
+				"0x{}",
+			],
+			"id": {}
+		}}"#, address, self.req_id);
+
+		self.request_using::<bool>(req)
 	}
 }
