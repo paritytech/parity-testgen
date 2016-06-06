@@ -1,13 +1,15 @@
 //! Event scheduler for the generator.
 use std::collections::VecDeque;
 
+use time::Duration;
+
 /// A handle for removing tasks.
 pub struct Handle(usize);
 
 // the mode of the task
 enum Mode {
 	// repeated every time this amount of milliseconds has passed.
-	Repeated(i64),
+	Repeated(Duration),
 	// execute once, with an initial delay of the given amount of millis.
 	Delay,
 }
@@ -15,7 +17,7 @@ enum Mode {
 struct SchedulerTask<'a> {
 	mode: Mode,
 	inner: Box<FnMut() + 'a>,
-	time_left: i64,
+	time_left: Duration,
 }
 
 #[derive(Default)]
@@ -26,8 +28,7 @@ pub struct Scheduler<'a> {
 
 impl<'a> Scheduler<'a> {
 	/// tick the scheduler
-	pub fn tick(&mut self, millis: i64) {
-		assert!(millis >= 0, "attempted to tick backwards in time!");
+	pub fn tick(&mut self, dt: Duration) {
 		let mut remove = Vec::new();
 
 		for (idx, task) in self.tasks.iter_mut().enumerate() {
@@ -36,8 +37,9 @@ impl<'a> Scheduler<'a> {
 				None => continue,
 			};
 
-			task.time_left -= millis;
-			if task.time_left <= 0 {
+			if let Some(remainder) = task.time_left.checked_sub(&dt) {
+				task.time_left = remainder;
+			} else {
 				(task.inner)();
 				match task.mode {
 					Mode::Repeated(how_often) => {
@@ -56,24 +58,22 @@ impl<'a> Scheduler<'a> {
 		}
 	}
 
-	/// Run a task approximately every `millis` milliseconds.
-	/// It will be run for the first time `millis` milliseconds after it is submitted.
-	pub fn once_every<F: FnMut() + 'a>(&mut self, millis: i64, f: F) -> Handle {
-		assert!(millis > 0, "created task with zero or less time between");
-
+	/// Run a task approximately every `dt` duration..
+	/// It will be run for the first time `dt` after it is first submitted.
+	pub fn once_every<F: FnMut() + 'a>(&mut self, dt: Duration, f: F) -> Handle {
 		self.add_task(SchedulerTask {
-			mode: Mode::Repeated(millis),
+			mode: Mode::Repeated(dt),
 			inner: Box::new(f),
-			time_left: millis,
+			time_left: dt,
 		})
 	}
 
-	/// Run a task once, delayed by approximately `millis` milliseconds.
-	pub fn delay_by<F: FnMut() + 'a>(&mut self, millis: i64, f: F) -> Handle {
+	/// Run a task once, delayed by approximately the given duration.
+	pub fn delay_by<F: FnMut() + 'a>(&mut self, dt: Duration, f: F) -> Handle {
 		self.add_task(SchedulerTask {
 			mode: Mode::Delay,
 			inner: Box::new(f),
-			time_left: millis,
+			time_left: dt,
 		})
 	}
 
