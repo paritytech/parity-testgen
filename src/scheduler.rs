@@ -77,6 +77,11 @@ impl<'a> Scheduler<'a> {
 		})
 	}
 
+	/// Remove a task by handle.
+	pub fn remove(&mut self, handle: Handle) {
+		self.tasks[handle.0] = None;
+	}
+
 	// add a task to the scheduler
 	fn add_task(&mut self, task: SchedulerTask<'a>) -> Handle {
 		if let Some(idx) = self.unused_ids.pop_front() {
