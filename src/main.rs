@@ -19,6 +19,7 @@ use ethstore::{DiskDirectory, EthStore};
 mod generate;
 mod replay;
 mod rpc;
+mod scheduler;
 
 const USAGE: &'static str = "
 Parity-testgen
