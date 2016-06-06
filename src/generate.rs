@@ -1,5 +1,6 @@
 use super::{Account, Action, Params};
 use super::rpc::Client;
+use super::scheduler::Scheduler;
 
 use ethkey::{KeyPair, Generator, Random};
 use ethstore::{EthStore, SecretStore};
@@ -8,9 +9,6 @@ use rand::{Rng, OsRng};
 
 use std::process::{Command, Stdio};
 use std::thread;
-
-// only wake up every X milliseconds.
-const SLEEP_BETWEEN_TICKS_MS: i64 = 500;
 
 // chance to create an account on a given tick.
 const CREATE_ACCOUNT_CHANCE: f32 = 0.025;
@@ -42,32 +40,43 @@ impl Simulation {
 		}
 	}
 
-	// tick the simulation.
-	//
-	// create new accounts, retire old ones, dispatch transactions, etc.
-	fn tick(&mut self) {
-		if self.rng.gen::<f32>() <= CREATE_ACCOUNT_CHANCE {
-			const PASS_LEN: usize = 20;
+	// run the simulation, blocking until it stops.
+	fn run(&mut self, start: Tm, end: Tm) {
+		let mut last = start;
+		let mut now = time::now();
+		let mut scheduler = Scheduler::default();
 
-			let pair = Random.generate().expect("failed to generate keypair");
-			let secret = pair.secret().clone();
-			let address = pair.address();
-			let pass = ::random_ascii_lowercase(PASS_LEN);
+		scheduler.once_every(Duration::milliseconds(10), || {
+			if self.rng.gen::<f32>() <= CREATE_ACCOUNT_CHANCE {
+				const PASS_LEN: usize = 20;
 
-			self.store.insert_account(secret.clone(), &pass).expect("failed to insert account");
-			let account = Account::new(address, secret, pass);
+				let pair = Random.generate().expect("failed to generate keypair");
+				let secret = pair.secret().clone();
+				let address = pair.address();
+				let pass = ::random_ascii_lowercase(PASS_LEN);
 
-			// have the first account be a miner.
-			if self.users.is_empty() && self.miners.is_empty() {
-				self.client.set_author(account.address());
-				self.miners.push(account);
-			} else if self.rng.gen::<f32>() <= MINER_PROPORTION {
-				self.miners.push(account);
-			} else {
-				self.users.push(account);
+				self.store.insert_account(secret.clone(), &pass).expect("failed to insert account");
+				let account = Account::new(address, secret, pass);
+
+				// have the first account be a miner.
+				if self.users.is_empty() && self.miners.is_empty() {
+					self.client.set_author(account.address());
+					self.miners.push(account);
+				} else if self.rng.gen::<f32>() <= MINER_PROPORTION {
+					self.miners.push(account);
+				} else {
+					self.users.push(account);
+				}
 			}
-		}
+		});
 
+		while now < end {
+			let dt = now - last;
+			last = now;
+			now = time::now();
+
+			scheduler.tick(dt);
+		}
 	}
 }
 
@@ -75,7 +84,6 @@ impl Simulation {
 ///
 /// Sends output to stdout.
 pub fn generate(params: Params) {
-	let sleep_between = Duration::milliseconds(SLEEP_BETWEEN_TICKS_MS).to_std().unwrap();
 	let run_for = Duration::seconds(params.args.flag_time as i64);
 	let start = time::now();
 	let end = start + run_for;
@@ -93,11 +101,7 @@ pub fn generate(params: Params) {
 		.stderr(Stdio::null())
 		.spawn().unwrap();
 
-	while time::now() < end {
-		sim.tick();
-
-		thread::sleep(sleep_between);
-	}
+	sim.run(start, end);
 
 	println!("Ending simulation");
 	let _ = parity_child.kill();
