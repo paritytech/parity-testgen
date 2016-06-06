@@ -6,7 +6,7 @@ use ethstore::{EthStore, SecretStore};
 use time::{self, Duration, Tm};
 use rand::{Rng, OsRng};
 
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::thread;
 
 // only wake up every X milliseconds.
@@ -82,10 +82,16 @@ pub fn generate(params: Params) {
 
 	println!("Executing parity");
 	// todo: set Stdout, etc.
-	let mut parity_child = params.parity_command().spawn().unwrap();
+	let mut parity_child = params.parity_command()
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn().unwrap();
 	let mut sim = Simulation::new(start, params.key_store);
 
-	let mut ethminer_child = Command::new("ethminer").spawn().unwrap();
+	let mut ethminer_child = Command::new("ethminer")
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn().unwrap();
 
 	while time::now() < end {
 		sim.tick();
@@ -94,6 +100,6 @@ pub fn generate(params: Params) {
 	}
 
 	println!("Ending simulation");
-	parity_child.kill();
-	ethminer_child.kill();
+	let _ = parity_child.kill();
+	let _ = ethminer_child.kill();
 }
