@@ -1,4 +1,4 @@
-use super::{Account, Action, Params};
+use super::{Account, Action, ActionKind, Params, Secret};
 use super::rpc::Client;
 use super::scheduler::Scheduler;
 
@@ -7,6 +7,7 @@ use ethstore::{EthStore, SecretStore};
 use time::{self, Duration, Tm};
 use rand::{Rng, OsRng};
 
+use std::cell::RefCell;
 use std::process::{Command, Stdio};
 use std::thread;
 
@@ -41,42 +42,49 @@ impl Simulation {
 	}
 
 	// run the simulation, blocking until it stops.
-	fn run(&mut self, start: Tm, end: Tm) {
-		let mut last = start;
+	fn run_until(&mut self, end: Tm) -> Vec<Action> {
+		let mut last = self.start;
 		let mut now = time::now();
-		let mut scheduler = Scheduler::default();
+		let actions = RefCell::new(Vec::new());
 
-		scheduler.once_every(Duration::milliseconds(10), || {
-			if self.rng.gen::<f32>() <= CREATE_ACCOUNT_CHANCE {
-				const PASS_LEN: usize = 20;
+		{
+			let mut scheduler = Scheduler::default();
 
-				let pair = Random.generate().expect("failed to generate keypair");
-				let secret = pair.secret().clone();
-				let address = pair.address();
-				let pass = ::random_ascii_lowercase(PASS_LEN);
+			scheduler.once_every(Duration::milliseconds(10), || {
+				if self.rng.gen::<f32>() <= CREATE_ACCOUNT_CHANCE {
+					const PASS_LEN: usize = 20;
 
-				self.store.insert_account(secret.clone(), &pass).expect("failed to insert account");
-				let account = Account::new(address, secret, pass);
+					let pair = Random.generate().expect("failed to generate keypair");
+					let secret: Secret = pair.secret().clone().into();
+					let address = pair.address().into();
+					let pass = ::random_ascii_lowercase(PASS_LEN);
 
-				// have the first account be a miner.
-				if self.users.is_empty() && self.miners.is_empty() {
-					self.client.set_author(account.address());
-					self.miners.push(account);
-				} else if self.rng.gen::<f32>() <= MINER_PROPORTION {
-					self.miners.push(account);
-				} else {
-					self.users.push(account);
+					self.store.insert_account(secret.0.clone(), &pass).expect("failed to insert account");
+					let account = Account::new(address, secret, pass);
+					actions.borrow_mut().push(Action::new(ActionKind::CreateAccount(account.clone()), time::now() - self.start));
+
+					// have the first account be a miner.
+					if self.users.is_empty() && self.miners.is_empty() {
+						self.client.set_author(account.address());
+						self.miners.push(account);
+					} else if self.rng.gen::<f32>() <= MINER_PROPORTION {
+						self.miners.push(account);
+					} else {
+						self.users.push(account);
+					}
 				}
+			});
+
+			while now < end {
+				let dt = now - last;
+				last = now;
+				now = time::now();
+
+				scheduler.tick(dt);
 			}
-		});
-
-		while now < end {
-			let dt = now - last;
-			last = now;
-			now = time::now();
-
-			scheduler.tick(dt);
 		}
+
+		actions.into_inner()
 	}
 }
 
@@ -94,14 +102,15 @@ pub fn generate(params: Params) {
 		.stdout(Stdio::null())
 		.stderr(Stdio::null())
 		.spawn().unwrap();
-	let mut sim = Simulation::new(start, params.key_store);
 
 	let mut ethminer_child = Command::new("ethminer")
 		.stdout(Stdio::null())
 		.stderr(Stdio::null())
 		.spawn().unwrap();
 
-	sim.run(start, end);
+	let mut sim = Simulation::new(start, params.key_store);
+
+	sim.run_until(end);
 
 	println!("Ending simulation");
 	let _ = parity_child.kill();
