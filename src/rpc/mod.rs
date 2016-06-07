@@ -1,5 +1,4 @@
 //! RPC client for communicating with parity.
-use ethkey::Address;
 use hyper::{self, Client as HttpClient};
 use serde::Deserialize;
 use serde_json;
@@ -8,6 +7,7 @@ use std::io::Read;
 use std::net::Ipv4Addr;
 
 use self::response::Response;
+use super::Address;
 
 mod response;
 
