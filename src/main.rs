@@ -149,7 +149,7 @@ impl Params {
 macro_rules! hash_wrapper {
 	($name: ident) => {
 		#[derive(Clone)]
-		struct $name(ethkey::$name);
+		pub struct $name(ethkey::$name);
 
 		impl serde::Serialize for $name {
 			fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>

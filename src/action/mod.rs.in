@@ -1,0 +1,89 @@
+use serde::{Serialize, Deserialize};
+use time::Duration;
+
+use super::{Secret, Address};
+
+/// Account metadata. This is created using a KeyStore shared by parity_testgen
+/// and parity itself.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Account {
+	address: Address,
+	secret: Secret,
+	pass: String,
+}
+
+impl Account {
+	/// Create a new account.
+	pub fn new(addr: Address, secret: Secret, pass: String) -> Account {
+		Account {
+			address: addr,
+			secret: secret,
+			pass: pass,
+		}
+	}
+
+	/// Get the account's address.
+	pub fn address(&self) -> Address { self.address.clone() }
+
+	/// Get the account's secret key.
+	pub fn secret(&self) -> Secret { self.secret.clone() }
+
+	/// Get the account's password.
+	pub fn pass(&self) -> String { self.pass.clone() }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct InternalDuration {
+	secs: u64,
+	nanos: u64,
+}
+
+impl From<Duration> for InternalDuration {
+	fn from(mut dur: Duration) -> Self {
+		assert!(dur >= Duration::zero());
+
+		let secs = dur.num_seconds();
+		dur = dur - Duration::seconds(secs);
+		let nanos = dur.num_nanoseconds().unwrap();
+
+		InternalDuration {
+			secs: secs as u64,
+			nanos: nanos as u64,
+		}
+	}
+}
+
+impl Into<Duration> for InternalDuration {
+	fn into(self) -> Duration {
+		Duration::seconds(self.secs as i64) + Duration::nanoseconds(self.nanos as i64)
+	}
+}
+
+// Kinds of actions and their details.
+#[derive(Clone, Serialize, Deserialize)]
+pub enum ActionKind {
+	// account details,
+	CreateAccount(Account),
+	// "retire" an account, making it go dormant
+	RetireAccount(Address),
+	// a block was mined, this is the sealing work.
+	BlockMined(Vec<u8>),
+}
+
+// actions which can be taken in the log file.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Action {
+	kind: ActionKind,
+
+	// time difference between "start" and action being taken
+	offset: InternalDuration,
+}
+
+impl Action {
+	pub fn new(kind: ActionKind, offset: Duration) -> Self {
+		Action {
+			kind: kind,
+			offset: offset.into(),
+		}
+	}
+}
