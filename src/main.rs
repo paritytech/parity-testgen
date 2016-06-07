@@ -9,17 +9,22 @@ extern crate serde_json;
 extern crate time;
 
 use std::io::Write;
+use std::fmt;
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::Command;
 
-use ethkey::{Address, KeyPair, Secret};
 use ethstore::{DiskDirectory, EthStore};
+use rustc_serialize::hex::{FromHex, ToHex};
+use time::Duration;
 
+mod action;
 mod generate;
 mod replay;
 mod rpc;
 mod scheduler;
+
+pub use ::action::{Account, Action, ActionKind};
 
 const USAGE: &'static str = "
 Parity-testgen
@@ -49,49 +54,11 @@ struct Args {
 	flag_time: usize,
 }
 
-/// Account metadata. This is created using a KeyStore shared by parity_testgen
-/// and parity itself.
-struct Account {
-	address: Address,
-	secret: Secret,
-	pass: String,
-}
-
-impl Account {
-	/// Create a new account.
-	pub fn new(addr: Address, secret: Secret, pass: String) -> Account {
-		Account {
-			address: addr,
-			secret: secret,
-			pass: pass,
-		}
-	}
-
-	/// Get the accont's address.
-	pub fn address(&self) -> Address { self.address.clone() }
-
-	/// Get the account's secret key.
-	pub fn secret(&self) -> Secret { self.secret.clone() }
-
-	/// Get the account's password.
-	pub fn pass(&self) -> String { self.pass.clone() }
-}
-
 fn random_ascii_lowercase(len: usize) -> String {
 	use rand::Rng;
 
 	let mut rng = rand::thread_rng();
 	(0..len).map(|_| (rng.gen::<u8>() % 26 + 97) as char).collect()
-}
-
-// actions which can be taken in the log file.
-enum Action {
-	// account details,
-	CreateAccount(Account),
-	// "retire" an account, making it go dormant
-	RetireAccount(Address),
-	// a block was mined, this will be some raw data for the replay.
-	BlockMined(Vec<u8>),
 }
 
 /// Keeps track of the directories we need to keep track of.
@@ -120,14 +87,14 @@ impl Directories {
 		self.root.clone()
 	}
 
-	/// Get the keys tore directory.
+	/// Get the keystore directory.
 	pub fn keys(&self) -> PathBuf {
 		let mut keys = self.root.clone();
 		keys.push("keys");
 		keys
 	}
 
-	/// Get the datbase directory.
+	/// Get the database directory.
 	pub fn db(&self) -> PathBuf {
 		let mut db = self.root.clone();
 		db.push("db");
@@ -178,6 +145,67 @@ impl Params {
 		c
 	}
 }
+
+macro_rules! hash_wrapper {
+	($name: ident) => {
+		#[derive(Clone)]
+		struct $name(ethkey::$name);
+
+		impl serde::Serialize for $name {
+			fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+			where S: serde::Serializer {
+				let mut hex = "0x".to_owned();
+				hex.push_str(self.0.to_hex().as_ref());
+				serializer.serialize_str(hex.as_ref())
+			}
+		}
+
+		impl serde::Deserialize for $name {
+			fn deserialize<D>(deserializer: &mut D) -> Result<$name, D::Error>
+			where D: serde::Deserializer {
+				struct HashVisitor;
+
+				impl serde::de::Visitor for HashVisitor {
+					type Value = $name;
+
+					fn visit_str<E>(&mut self, value: &str) -> Result<Self::Value, E> where E: serde::Error {
+						let mut data = ::ethkey::$name::default();
+
+						// 0x + len
+						if value.len() != 2 + data.len() * 2 {
+							return Err(serde::Error::custom("Invalid length."));
+						}
+
+						let bytes = try!(value[2..].from_hex().map_err(|_| serde::Error::custom("Invalid hex value.")));
+						data.copy_from_slice(&bytes);
+
+						Ok($name(data))
+					}
+
+					fn visit_string<E>(&mut self, value: String) -> Result<Self::Value, E> where E: serde::Error {
+						self.visit_str(value.as_ref())
+					}
+				}
+				deserializer.deserialize(HashVisitor)
+			}
+		}
+
+		impl From<ethkey::$name> for $name {
+			fn from(inner: ethkey::$name) -> Self {
+				$name(inner)
+			}
+		}
+
+		impl fmt::Display for $name {
+			fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+				self.0.fmt(f)
+			}
+		}
+	}
+}
+
+hash_wrapper!(Address);
+hash_wrapper!(Secret);
 
 fn main() {
 	let args: Args = docopt::Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
