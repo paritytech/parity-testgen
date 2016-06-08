@@ -71,7 +71,7 @@ impl Client {
 			"jsonrpc": "2.0",
 			"method": "ethcore_setAuthor",
 			"params": [
-				"0x{}",
+				"0x{}"
 			],
 			"id": {}
 		}}"#, address, self.req_id);

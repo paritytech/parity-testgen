@@ -8,7 +8,10 @@ use time::{self, Duration, Tm};
 use rand::{Rng, OsRng};
 
 use std::cell::RefCell;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
+
+// amount of time to wait for parity to start up.
+const STARTUP_TIME_SECONDS: u64 = 3;
 
 // chance to create an account on a given tick.
 const CREATE_ACCOUNT_CHANCE: f32 = 0.025;
@@ -85,31 +88,54 @@ impl Simulation {
 	}
 }
 
+struct ChildKiller {
+	parity: Child,
+	ethminer: Child,
+}
+
+impl Drop for ChildKiller {
+	fn drop(&mut self) {
+		let _ = self.parity.kill();
+		let _ = self.ethminer.kill();
+	}
+}
+
 /// Generate a test using random processes.
 ///
 /// Sends output to stdout.
 pub fn generate(params: Params) {
 	let run_for = Duration::seconds(params.args.flag_time as i64);
-	let start = time::now();
-	let end = start + run_for;
 
 	println!("Executing parity");
 	// todo: set Stdout, etc.
-	let mut parity_child = params.parity_command()
+	let parity_child = params.parity_command()
 		.stdout(Stdio::null())
 		.stderr(Stdio::null())
 		.spawn().unwrap();
 
-	let mut ethminer_child = Command::new("ethminer")
+	::std::thread::sleep(::std::time::Duration::from_secs(STARTUP_TIME_SECONDS));
+
+	let ethminer_child = Command::new("ethminer")
 		.stdout(Stdio::null())
 		.stderr(Stdio::null())
 		.spawn().unwrap();
+
+	let child_killer = ChildKiller {
+		parity: parity_child,
+		ethminer: ethminer_child,
+	};
+
+	let start = time::now();
+	let end = start + run_for;
 
 	let mut sim = Simulation::new(start, params.key_store);
 
-	sim.run_until(end);
+	let actions = sim.run_until(end);
 
 	println!("Ending simulation");
-	let _ = parity_child.kill();
-	let _ = ethminer_child.kill();
+	drop(child_killer);
+
+	println!("Actions produced: ");
+	let actions_val = ::serde_json::to_value(&actions);
+	println!("{:#?}", actions_val);
 }
