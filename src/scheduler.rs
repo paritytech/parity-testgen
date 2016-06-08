@@ -29,6 +29,8 @@ pub struct Scheduler<'a> {
 impl<'a> Scheduler<'a> {
 	/// tick the scheduler
 	pub fn tick(&mut self, dt: Duration) {
+		assert!(dt > Duration::zero());
+
 		let mut remove = Vec::new();
 
 		for (idx, task) in self.tasks.iter_mut().enumerate() {
@@ -37,8 +39,9 @@ impl<'a> Scheduler<'a> {
 				None => continue,
 			};
 
-			if let Some(remainder) = task.time_left.checked_sub(&dt) {
-				task.time_left = remainder;
+			let new_time = task.time_left - dt;
+			if new_time > Duration::zero() {
+				task.time_left = new_time;
 			} else {
 				(task.inner)();
 				match task.mode {
