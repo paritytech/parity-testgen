@@ -64,9 +64,11 @@ pub enum ActionKind {
 	// account details,
 	CreateAccount(Account),
 	// "retire" an account, making it go dormant
-	RetireAccount(Address),
+	RetireAccount(Account),
 	// a block was mined, this is the sealing work.
 	BlockMined(Vec<u8>),
+	// set an account as the author.
+	SetAuthor(Account),
 }
 
 // actions which can be taken in the log file.

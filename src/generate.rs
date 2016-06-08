@@ -56,6 +56,9 @@ impl Simulation {
 
 			scheduler.once_every(Duration::milliseconds(10), || self.account_creation());
 
+			// change the author once every 5 seconds.
+			scheduler.once_every(Duration::seconds(5), || self.change_author());
+
 			while now < end {
 				let dt = now - last;
 				last = now;
@@ -98,7 +101,9 @@ impl Simulation {
 			// have the first account be a miner.
 			if users.is_empty() && miners.is_empty() {
 				client.set_author(account.address()).unwrap();
-				miners.push(account);
+				miners.push(account.clone());
+
+				actions.push(Action::new(ActionKind::SetAuthor(account), time::now() - self.start));
 			} else if rng.gen::<f32>() <= MINER_PROPORTION {
 				miners.push(account);
 			} else {
@@ -106,8 +111,21 @@ impl Simulation {
 			}
 		}
 	}
+
+	// block author change routine.
+	fn change_author(&self) {
+		let mut rng = self.rng();
+		let miners = self.miners();
+
+		let idx = rng.gen::<usize>() % miners.len();
+		let acc = miners[idx].clone();
+
+		self.client().set_author(acc.address()).unwrap();
+		self.actions().push(Action::new(ActionKind::SetAuthor(acc), time::now() - self.start));
+	}
 }
 
+// panic guard for killing the child processes.
 struct ChildKiller {
 	parity: Child,
 	ethminer: Child,
