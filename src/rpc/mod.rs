@@ -1,5 +1,5 @@
 //! RPC client for communicating with parity.
-use hyper::{self, Client as HttpClient};
+use hyper::{self, Client as HttpClient, header};
 use serde::Deserialize;
 use serde_json;
 
@@ -40,7 +40,9 @@ impl Client {
 	fn request_using<T: Deserialize>(&mut self, req: String) -> Result<T, Error> {
 		self.req_id += 1;
 		let mut res_str = String::new();
-		let mut res = try!(self.http_client.post(&self.server_url).body(&req).send().map_err(Error::Hyper));
+
+		let content_type = header::ContentType::json();
+		let mut res = try!(self.http_client.post(&self.server_url).header(content_type).body(&req).send().map_err(Error::Hyper));
 		try!(res.read_to_string(&mut res_str).map_err(Error::Io));
 
 		Ok(try!(Response::from_json(&res_str)).result())
