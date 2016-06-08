@@ -103,7 +103,7 @@ impl Simulation {
 				client.set_author(account.address()).unwrap();
 				miners.push(account.clone());
 
-				actions.push(Action::new(ActionKind::SetAuthor(account), time::now() - self.start));
+				actions.push(Action::new(ActionKind::SetAuthor(account.address()), time::now() - self.start));
 			} else if rng.gen::<f32>() <= MINER_PROPORTION {
 				miners.push(account);
 			} else {
@@ -121,7 +121,7 @@ impl Simulation {
 		let acc = miners[idx].clone();
 
 		self.client().set_author(acc.address()).unwrap();
-		self.actions().push(Action::new(ActionKind::SetAuthor(acc), time::now() - self.start));
+		self.actions().push(Action::new(ActionKind::SetAuthor(acc.address()), time::now() - self.start));
 	}
 }
 
