@@ -16,7 +16,7 @@ const STARTUP_TIME_SECONDS: u64 = 3;
 /// Manages simulation data.
 struct Simulation {
 	actions: RefCell<Vec<Action>>,
-	store: RefCell<EthStore>,
+	store: EthStore,
 	users: RefCell<Vec<Account>>,
 	miners: RefCell<Vec<Account>>,
 	client: RefCell<Client>,
@@ -28,7 +28,7 @@ impl Simulation {
 	fn new(start: Tm, store: EthStore) -> Self {
 		Simulation {
 			actions: RefCell::new(Vec::new()),
-			store: RefCell::new(store),
+			store: store,
 			users: RefCell::new(Vec::new()),
 			miners: RefCell::new(Vec::new()),
 			client: RefCell::new(Client::new()),
@@ -40,7 +40,6 @@ impl Simulation {
 	// helpers for refcell borrowing.
 
 	fn actions(&self) -> RefMut<Vec<Action>> { self.actions.borrow_mut() }
-	fn store(&self) -> RefMut<EthStore> { self.store.borrow_mut() }
 	fn users(&self) -> RefMut<Vec<Account>> { self.users.borrow_mut() }
 	fn miners(&self) -> RefMut<Vec<Account>> { self.miners.borrow_mut() }
 	fn client(&self) -> RefMut<Client> { self.client.borrow_mut() }
@@ -80,7 +79,6 @@ impl Simulation {
 		const MINER_PROPORTION: f32 = 0.4;
 
 		let mut actions = self.actions();
-		let mut store = self.store();
 		let mut rng = self.rng();
 		let mut users = self.users();
 		let mut miners = self.miners();
@@ -94,7 +92,7 @@ impl Simulation {
 			let address = pair.address().into();
 			let pass = ::random_ascii_lowercase(PASS_LEN);
 
-			store.insert_account(secret.0.clone(), &pass).expect("failed to insert account");
+			self.store.insert_account(secret.0.clone(), &pass).expect("failed to insert account");
 			let account = Account::new(address, secret, pass);
 			actions.push(Action::new(ActionKind::CreateAccount(account.clone()), time::now() - self.start));
 
@@ -167,7 +165,7 @@ pub fn generate(params: Params) -> Vec<Action> {
 	let start = time::now();
 	let end = start + run_for;
 
-	let mut sim = Simulation::new(start, params.key_store);
+	let sim = Simulation::new(start, params.key_store);
 
 	let actions = sim.run_until(end);
 

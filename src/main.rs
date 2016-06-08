@@ -42,6 +42,7 @@ Options:
   --parity FILE     The parity executable to run.
   --time SECONDS    The amount of time to spend generating a test.
                     Note that the blocktime is 15 seconds. [default: 900]
+  --log-file FILE   The file to write actions out to. [default: out.log]
 ";
 
 const DEFAULT_CHAIN: &'static str = include_str!("chainspec.json");
@@ -51,6 +52,7 @@ struct Args {
 	flag_replay: Option<String>,
 	flag_parity: Option<String>,
 	flag_time: usize,
+	flag_log_file: String,
 }
 
 fn random_ascii_lowercase(len: usize) -> String {
@@ -214,6 +216,10 @@ fn main() {
 	if let Some(file) = params.args.flag_replay.clone() {
 		::replay::replay(file.into(), params);
 	} else {
-		::generate::generate(params);
+		let log_filename = params.args.flag_log_file.clone();
+		let actions = ::generate::generate(params);
+
+		let mut log_file = File::create(log_filename).unwrap();
+		let _ = write!(log_file, "{}", ::serde_json::to_value(&actions));
 	}
 }
