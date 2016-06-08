@@ -16,7 +16,6 @@ use std::process::Command;
 
 use ethstore::{DiskDirectory, EthStore};
 use rustc_serialize::hex::{FromHex, ToHex};
-use time::Duration;
 
 mod action;
 mod generate;

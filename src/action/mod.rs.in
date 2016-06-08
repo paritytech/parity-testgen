@@ -1,4 +1,3 @@
-use serde::{Serialize, Deserialize};
 use time::Duration;
 
 use super::{Secret, Address};

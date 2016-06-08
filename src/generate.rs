@@ -2,14 +2,13 @@ use super::{Account, Action, ActionKind, Params, Secret};
 use super::rpc::Client;
 use super::scheduler::Scheduler;
 
-use ethkey::{KeyPair, Generator, Random};
+use ethkey::{Generator, Random};
 use ethstore::{EthStore, SecretStore};
 use time::{self, Duration, Tm};
 use rand::{Rng, OsRng};
 
 use std::cell::RefCell;
 use std::process::{Command, Stdio};
-use std::thread;
 
 // chance to create an account on a given tick.
 const CREATE_ACCOUNT_CHANCE: f32 = 0.025;
@@ -25,7 +24,6 @@ struct Simulation {
 	client: Client,
 	start: Tm,
 	rng: OsRng,
-	actions: Vec<(Duration, Action)>,
 }
 
 impl Simulation {
@@ -36,7 +34,6 @@ impl Simulation {
 			miners: Vec::new(),
 			client: Client::new(),
 			start: start,
-			actions: Vec::new(),
 			rng: OsRng::new().expect("failed to initialize rng"),
 		}
 	}
@@ -65,7 +62,7 @@ impl Simulation {
 
 					// have the first account be a miner.
 					if self.users.is_empty() && self.miners.is_empty() {
-						self.client.set_author(account.address());
+						self.client.set_author(account.address()).unwrap();
 						self.miners.push(account);
 					} else if self.rng.gen::<f32>() <= MINER_PROPORTION {
 						self.miners.push(account);

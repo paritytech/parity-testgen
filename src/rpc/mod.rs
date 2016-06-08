@@ -4,7 +4,6 @@ use serde::Deserialize;
 use serde_json;
 
 use std::io::Read;
-use std::net::Ipv4Addr;
 
 use self::response::Response;
 use super::Address;
@@ -12,6 +11,7 @@ use super::Address;
 mod response;
 
 /// Errors which can be encountered.
+#[derive(Debug)]
 pub enum Error {
 	Hyper(hyper::Error),
 	Io(::std::io::Error),
