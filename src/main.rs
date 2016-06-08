@@ -139,6 +139,7 @@ impl Params {
 	fn parity_command(&self) -> Command {
 		let mut c = Command::new(self.args.flag_parity.clone().unwrap_or("parity".into()));
 		c.arg("--keys-path").arg(self.dirs.keys());
+		c.arg("--jsonrpc-apis").arg("eth,ethcore,personal");
 		c.arg("--db-path").arg(self.dirs.db());
 		c.arg("--chain").arg(self.dirs.chain_file());
 		c
